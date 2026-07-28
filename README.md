@@ -1,11 +1,11 @@
-# Amiga CD32² (CD32 Squared)
+# Amiga FlameSnow
 
-**MontêLauro CD32²** — Sucessor espiritual do Amiga CD³². Plataforma aberta de
+**Amiga FlameSnow** — Sucessor espiritual do Amiga CD³². Plataforma aberta de
 videogame com emulador cycle-accurate, runtime C para jogos (`libcd32.a`),
 SDK completo e ferramentas de build.
 
 ```text
- Amiga CD³² (1993) → Amiga CD32² (1999)
+ Amiga CD³² (1993) → Amiga FlameSnow (2024)
      32 bits               64 bits
      Motorola 68EC020      PowerPC 603e + ColdFire V4e
      Akiko chip            GPU Lisa II TBDR
@@ -257,7 +257,7 @@ kernel.c:_start()
 
 ## Hardware Especulado
 
-| Componente | Amiga CD³² (1993) | Amiga CD32² |
+| Componente | Amiga CD³² (1993) | Amiga FlameSnow |
 |---|---|---|
 | CPU | Motorola 68EC020 @ 14MHz | PowerPC 603e @ 266MHz |
 | Coprocessador | Akiko (CD controller) | ColdFire V4e @ 140MHz |
