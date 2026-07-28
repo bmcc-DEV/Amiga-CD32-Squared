@@ -193,7 +193,7 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
     use std::time::Duration;
 
     use sdl2::controller::{Axis, Button};
-    use ml_gd2_rs::sdl_debug::{SdlLogger, render_debug_window, render_log_window, capture_log};
+    use ml_gd2_rs::sdl_debug::{SdlLogger, render_debug_window, render_log_window, render_osd, capture_log};
 
     log::set_boxed_logger(Box::new(SdlLogger))
         .expect("SdlLogger already set (try sem --sdl primeiro)");
@@ -231,6 +231,10 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
 
     let mut running = true;
     let mut ep = sdl.event_pump().expect("event pump");
+    let mut fps: f64 = 0.0;
+    let mut speed: f64 = 0.0;
+    let mut frame_timer = std::time::Instant::now();
+    let mut frame_count: u64 = 0;
 
     // Janela ativa para copia: 0=main, 1=debug, 2=log
     let mut active: u8 = 0;
@@ -243,7 +247,7 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
     // Game Controller (controle analogico)
     let mut controller: Option<sdl2::controller::GameController> = None;
     for i in 0..controller_subsystem.num_joysticks().unwrap_or(0) {
-        if controller_subsystem.is_game_controller(i).unwrap_or(false) {
+        if controller_subsystem.is_game_controller(i) {
             if let Ok(c) = controller_subsystem.open(i) {
                 log::info!("Controller connected: {}", c.name());
                 controller = Some(c);
@@ -287,7 +291,7 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
                 Event::MouseButtonDown { mouse_btn: MouseButton::Right, window_id, .. } => {
                     let text = if window_id == dbg_id {
                         let mut lines = Vec::new();
-                        cd32_rs::sdl_debug::format_debug_text(&hw, &mut lines);
+                        ml_gd2_rs::sdl_debug::format_debug_text(&hw, &mut lines);
                         lines.join("\n")
                     } else if window_id == log_id {
                         let mut lines = Vec::new();
@@ -396,6 +400,20 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
             }
         });
         canvas.copy(&tex, None, None).expect("copy");
+
+        // FPS tracking
+        frame_count += 1;
+        let elapsed = frame_timer.elapsed();
+        if elapsed.as_secs() >= 1 {
+            fps = frame_count as f64 / elapsed.as_secs_f64();
+            speed = fps / 60.0;
+            frame_timer = std::time::Instant::now();
+            frame_count = 0;
+        }
+
+        // OSD overlay
+        render_osd(&mut canvas, &hw, fps, speed);
+
         canvas.present();
 
         // Debug

@@ -31,7 +31,7 @@ impl log::Log for SdlLogger {
 }
 
 pub fn capture_log(buf: &mut Vec<String>) {
-    if let Ok(mut log_buf) = LOG_BUF.lock() {
+    if let Ok(log_buf) = LOG_BUF.lock() {
         buf.clear();
         buf.extend(log_buf.iter().cloned());
     }
@@ -184,6 +184,55 @@ pub fn render_log_window(canvas: &mut Canvas<Window>) {
         };
         draw_text(canvas, 4, y, msg, color, bg);
         y -= 10;
+    }
+}
+
+// ── OSD: renderiza logs sobre o vídeo principal ──────────────────
+
+pub fn render_osd(canvas: &mut Canvas<Window>, hw: &Cd32Hardware, fps: f64, speed: f64) {
+    let bg = Color::RGB(16, 16, 32);
+    let fg = Color::RGB(200, 200, 200);
+    let hl = Color::RGB(100, 200, 255);
+    let warn = Color::RGB(255, 200, 80);
+    let err = Color::RGB(255, 80, 80);
+
+    let mut lines: Vec<String> = Vec::new();
+    capture_log(&mut lines);
+
+    let n = lines.len().min(8);
+    let start = lines.len().saturating_sub(8);
+    let lines = &lines[start..];
+
+    let line_h = 10;
+    let header_h = 2; // LOG header + FPS line
+    let total_h = (n as i32 * line_h) + (header_h * line_h) + 6;
+
+    let mut y = 480 - total_h;
+    let x = 4;
+
+    // fundo semi-transparente
+    canvas.set_draw_color(Color::RGBA(0, 0, 0, 180));
+    let _ = canvas.fill_rect(sdl2::rect::Rect::new(
+        0, y, 640, total_h as u32,
+    ));
+
+    draw_text(canvas, x, y, "═══ LOG ═══", hl, bg);
+    y += line_h;
+
+    let fps_line = format!("FPS: {:.0}  Speed: {:.0}%  Cycles: {}", fps, speed * 100.0, hw.total_cycles);
+    draw_text(canvas, 640 - (fps_line.len() as i32 * 9) - 4, y, &fps_line, hl, bg);
+    y += line_h;
+
+    for msg in lines.iter() {
+        let color = if msg.contains("ERROR") || msg.contains("error") {
+            err
+        } else if msg.contains("WARN") || msg.contains("warn") {
+            warn
+        } else {
+            fg
+        };
+        draw_text(canvas, x, y, msg, color, bg);
+        y += line_h;
     }
 }
 
