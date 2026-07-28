@@ -5,14 +5,13 @@ videogame com emulador cycle-accurate, runtime C para jogos (`libcd32.a`),
 SDK completo e ferramentas de build.
 
 ```text
- Amiga CD³² (1993) → Amiga CD32² (2024)
+ Amiga CD³² (1993) → Amiga CD32² (1999)
      32 bits               64 bits
      Motorola 68EC020      PowerPC 603e + ColdFire V4e
      Akiko chip            GPU Lisa II TBDR
      2MB Chip RAM          28MB RAM unificada
 ```
 
-**Repositório:** [github.com/bmcc-DEV/ml-gd2](https://github.com/bmcc-DEV/ml-gd2)
 **CI:** `make ci` — pipeline completo, sem dependência externa.
 
 ---
