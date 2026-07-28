@@ -2,7 +2,7 @@
 name = "ml-gd2-rs"
 version = "0.1.0"
 edition = "2021"
-description = "MontêLauro CD+G² emulator — retro/new console project"
+description = "Amiga CD32² (CD32 Squared) — sucessor do CD³², emulador + runtime + SDK"
 default-run = "ml-gd2-rs"
 
 [dependencies]
