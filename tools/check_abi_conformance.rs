@@ -176,8 +176,8 @@ fn main() {
 
     // Verifica constantes de memória unificada na spec (best-effort)
     let mut notes = HashMap::new();
-    if spec.contains("24MB") || spec.contains("0x0180_0000") || spec.contains("0x01800000") {
-        notes.insert("unified_24mb", true);
+    if spec.contains("28MB") || spec.contains("0x01C0_0000") || spec.contains("0x01C00000") {
+        notes.insert("unified_28mb", true);
     }
 
     if ok {
@@ -185,8 +185,8 @@ fn main() {
             "ABI CONFORMANCE: PASS ({} fields, size={} bytes){}",
             c_fields.len(),
             size,
-            if notes.contains_key("unified_24mb") {
-                " [24MB unified noted in spec]"
+            if notes.contains_key("unified_28mb") {
+                " [28MB unified noted in spec]"
             } else {
                 ""
             }

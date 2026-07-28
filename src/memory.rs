@@ -31,7 +31,7 @@ pub const TOTAL_RAM_BYTES: u32 = UNIFIED_RAM_SIZE as u32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemRegion {
-    /// RAM unificada 24MB (substitui SysRAM+ChipRAM).
+    /// RAM unificada 28MB (substitui SysRAM+ChipRAM).
     UnifiedRam,
     /// Alias legado — mesmo backing que UnifiedRam.
     SystemRam,

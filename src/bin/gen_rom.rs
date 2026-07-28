@@ -229,7 +229,7 @@ fn build_ppc_aros() -> Vec<u32> {
     // === Fase 5: Passar params nos registradores ===
     w!(i_addis(4, 0, 0x0001));
     w!(i_ori(4, 4, 0x0001));     // r4 = CPUType
-    w!(i_addis(5, 0, 0x0180));   // r5 = MemSize 24MB
+    w!(i_addis(5, 0, 0x01C0));   // r5 = MemSize 28MB
     w!(i_addis(6, 0, 0));
     w!(i_ori(6, 6, 0x0002));     // r6 = PlatformInfo
     w!(i_addis(7, 0, 0x0100));   // r7 = ColdFireMailbox

@@ -1,6 +1,6 @@
 //! Bus Interface e arbitragem PPC ↔ ColdFire ↔ GPU.
 //!
-//! A MIU gere o acesso à RAM unificada de 24MB e aos periféricos.
+//! A MIU gere o acesso à RAM unificada de 28MB e aos periféricos.
 //! O barramento ColdFire roda a 140MHz e o PPC a 266MHz.
 
 use crate::memory::{MemRegion, MemoryMap};

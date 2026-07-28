@@ -14,7 +14,7 @@ jobs:
       - run: cargo run --bin check-abi --release
       - run: mkdir -p rom
       - run: cargo run --bin gen-rom --release -- --target hello --output rom/hello_cd32.rom
-      - run: cargo run --release --bin cd32-rs -- --bios rom/hello_cd32.rom --cycles 50000
+      - run: cargo run --release --bin ml-gd2-rs -- --bios rom/hello_cd32.rom --cycles 50000
       - run: cargo run --bin gen-rom --release -- --target aros-bootstrap --output rom/aros_cd32.rom
-      - run: cargo run --release --bin cd32-rs -- --bios rom/aros_cd32.rom --cycles 50000
+      - run: cargo run --release --bin ml-gd2-rs -- --bios rom/aros_cd32.rom --cycles 50000
 

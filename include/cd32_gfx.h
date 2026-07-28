@@ -7,9 +7,9 @@
 enum {
     CD32_DL_NOP      = 0x0000,
     CD32_DL_CLEAR    = 0x0001, /* data = 0x00RRGGBB */
-    CD32_DL_RECT     = 0x0002, /* flags=(x:6|y:6|w:6|h:6), data=color */
-    CD32_DL_TRIANGLE = 0x0003, /* data = ponteiro p/ vertices no buffer */
-    CD32_DL_LINE     = 0x0004, /* flags=(x0:8|y0:8), data=(x1:16|y1:16|color:32) */
+    CD32_DL_RECT     = 0x0002, /* flags=(x:4|y:4|w:4|h:4) x,w×40 y,h×30; data=color */
+    CD32_DL_TRIANGLE = 0x0003, /* data = byte offset p/ {x:16,y:16}×3 + color */
+    CD32_DL_LINE     = 0x0004, /* data = byte offset p/ {x0,y0,x1,y1:16 + color} */
     CD32_DL_END      = 0xFFFF,
 };
 

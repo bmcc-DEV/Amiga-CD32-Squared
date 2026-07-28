@@ -8,9 +8,9 @@
 //!
 //! Comandos:
 //!   0x0001 CLEAR  — data = 0x00RRGGBB
-//!   0x0002 RECT   — flags = (x:5|y:5|w:5|h:5) ; data = color
-//!   0x0003 TRI    — data = pointer p/ {x:16,y:16,color:32} * 3
-//!   0x0004 LINE   — flags = (x0:8|y0:8) ; data = (x1:16|y1:16)
+//!   0x0002 RECT   — flags = (x:4|y:4|w:4|h:4); x,w×40px; y,h×30px; data = color
+//!   0x0003 TRI    — data = byte offset no buffer p/ {x:16,y:16}×3 + color:32
+//!   0x0004 LINE   — data = byte offset no buffer p/ {x0,y0,x1,y1:16 + color:32}
 //!   0xFFFF END    — fim da lista
 
 const FB_WIDTH: u32 = 640;
@@ -73,11 +73,11 @@ impl Gpu {
                     }
                 }
                 0x0002 => {
-                    // RECT: flags = (x:6|y:6|w:6|h:6) * 10px cada
-                    let x = ((flags >> 10) & 0x3F) as i32 * 10;
-                    let y = ((flags >> 5) & 0x1F) as i32 * 10;
-                    let w = ((flags >> 10) & 0x3F) as i32 * 10;
-                    let h = (flags & 0x1F) as i32 * 10;
+                    // RECT: flags = (x:4|y:4|w:4|h:4); x,w ×40px; y,h ×30px
+                    let x = ((flags >> 12) & 0xF) as i32 * 40;
+                    let y = ((flags >> 8) & 0xF) as i32 * 30;
+                    let w = ((flags >> 4) & 0xF) as i32 * 40;
+                    let h = (flags & 0xF) as i32 * 30;
                     let color = (data | 0xFF000000).to_be_bytes();
                     for row in y..y + h {
                         for col in x..x + w {
@@ -91,28 +91,28 @@ impl Gpu {
                     }
                 }
                 0x0003 => {
+                    // TRI: data = byte offset no cmd_buf → 3×(x:16|y:16) + color
                     let ptr = data as usize;
+                    if ptr + 16 > cmd_buf.len() { continue; }
                     let mut verts = [(0i32, 0i32, 0u32); 3];
                     for i in 0..3 {
-                        let voff = ptr + i * 4; // cada vertice = 1 word (x:16|y:16)
-                        if voff + 4 > cmd_buf.len() { break; }
+                        let voff = ptr + i * 4;
                         let vx = read_u16(cmd_buf, voff) as i16 as i32;
                         let vy = read_u16(cmd_buf, voff + 2) as i16 as i32;
-                        verts[i as usize] = (vx, vy, 0);
+                        verts[i] = (vx, vy, 0);
                     }
-                    // Cor compartilhada no word apos os 3 vertices
-                    let vc = if ptr + 12 < cmd_buf.len() {
-                        read_u32(cmd_buf, ptr + 12) | 0xFF000000
-                    } else { 0xFFFFFFFF };
+                    let vc = read_u32(cmd_buf, ptr + 12) | 0xFF000000;
                     Self::raster_tri(verts[0], verts[1], verts[2], vc, vram);
                 }
                 0x0004 => {
-                    // LINE: flags = (x0:8|y0:8) ; data = (x1:16|y1:16|color:32)
-                    let x0 = (flags >> 8) as i8 as i32;
-                    let y0 = (flags as u8) as i8 as i32;
-                    let x1 = ((data >> 16) as u16) as i16 as i32;
-                    let y1 = (data as u16) as i16 as i32;
-                    let color = 0xFFFFFFFFu32.to_be_bytes();
+                    // LINE: data = byte offset → x0:16|y0:16|x1:16|y1:16|color:32
+                    let ptr = data as usize;
+                    if ptr + 12 > cmd_buf.len() { continue; }
+                    let x0 = read_u16(cmd_buf, ptr) as i16 as i32;
+                    let y0 = read_u16(cmd_buf, ptr + 2) as i16 as i32;
+                    let x1 = read_u16(cmd_buf, ptr + 4) as i16 as i32;
+                    let y1 = read_u16(cmd_buf, ptr + 6) as i16 as i32;
+                    let color = (read_u32(cmd_buf, ptr + 8) | 0xFF000000).to_be_bytes();
                     let dx = if x1 > x0 { x1 - x0 } else { x0 - x1 };
                     let dy = if y1 > y0 { y1 - y0 } else { y0 - y1 };
                     let sx = if x0 < x1 { 1 } else { -1 };
@@ -139,10 +139,10 @@ impl Gpu {
     fn raster_tri(a: (i32, i32, u32), b: (i32, i32, u32), c: (i32, i32, u32), color: u32, vram: &mut [u8]) {
         let (x0, y0, _) = a; let (x1, y1, _) = b; let (x2, y2, _) = c;
         let col_bytes = (color | 0xFF000000).to_be_bytes();
-        let mut minx = x0.min(x1).min(x2).max(0);
-        let mut maxx = x0.max(x1).max(x2).min(FB_WIDTH as i32 - 1);
-        let mut miny = y0.min(y1).min(y2).max(0);
-        let mut maxy = y0.max(y1).max(y2).min(FB_HEIGHT as i32 - 1);
+        let minx = x0.min(x1).min(x2).max(0);
+        let maxx = x0.max(x1).max(x2).min(FB_WIDTH as i32 - 1);
+        let miny = y0.min(y1).min(y2).max(0);
+        let maxy = y0.max(y1).max(y2).min(FB_HEIGHT as i32 - 1);
         let sa = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
         for y in miny..=maxy {
             for x in minx..=maxx {
@@ -223,5 +223,52 @@ mod tests {
         assert_eq!(g.regs[0x10], 1);
         assert!(g.regs[0x20] & 1 != 0);
         assert_eq!(g.state, GpuState::Idle);
+    }
+
+    #[test]
+    fn rect_uses_independent_width() {
+        let mut vram = vec![0u8; (FB_WIDTH * FB_HEIGHT * 4) as usize];
+        // x=1 (40), y=1 (30), w=2 (80), h=1 (30), color=red
+        let flags: u16 = (1 << 12) | (1 << 8) | (2 << 4) | 1;
+        let mut dl = Vec::new();
+        dl.extend_from_slice(&0x0002u16.to_be_bytes());
+        dl.extend_from_slice(&flags.to_be_bytes());
+        dl.extend_from_slice(&0x00FF0000u32.to_be_bytes());
+        dl.extend_from_slice(&0xFFFFu16.to_be_bytes());
+        dl.extend_from_slice(&0u16.to_be_bytes());
+        dl.extend_from_slice(&0u32.to_be_bytes());
+        Gpu::exec_dl(&dl, &mut vram);
+
+        let px = |x: u32, y: u32| {
+            let i = ((y * FB_WIDTH + x) * 4) as usize;
+            &vram[i..i + 4]
+        };
+        assert_eq!(px(40, 30), &[0xFF, 0xFF, 0x00, 0x00]);
+        assert_eq!(px(119, 30), &[0xFF, 0xFF, 0x00, 0x00]); // last col of w=80
+        assert_eq!(px(120, 30), &[0, 0, 0, 0]); // outside width
+        assert_eq!(px(79, 30), &[0xFF, 0xFF, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn line_reads_color_from_buffer() {
+        let mut vram = vec![0u8; (FB_WIDTH * FB_HEIGHT * 4) as usize];
+        // Vertex/line data at offset 16
+        let mut dl = vec![0u8; 32];
+        // CMD at 0: LINE, data=16
+        dl[0..2].copy_from_slice(&0x0004u16.to_be_bytes());
+        dl[2..4].copy_from_slice(&0u16.to_be_bytes());
+        dl[4..8].copy_from_slice(&16u32.to_be_bytes());
+        // Line params at 16: (10,10)-(20,10) green
+        dl[16..18].copy_from_slice(&10u16.to_be_bytes());
+        dl[18..20].copy_from_slice(&10u16.to_be_bytes());
+        dl[20..22].copy_from_slice(&20u16.to_be_bytes());
+        dl[22..24].copy_from_slice(&10u16.to_be_bytes());
+        dl[24..28].copy_from_slice(&0x0000FF00u32.to_be_bytes());
+        // END
+        dl[8..10].copy_from_slice(&0xFFFFu16.to_be_bytes());
+        Gpu::exec_dl(&dl, &mut vram);
+
+        let i = ((10u32 * FB_WIDTH + 15) * 4) as usize;
+        assert_eq!(&vram[i..i + 4], &[0xFF, 0x00, 0xFF, 0x00]);
     }
 }

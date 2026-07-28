@@ -292,7 +292,7 @@ pub fn save_state(hw: &Cd32Hardware, path: &Path) -> Result<(), SaveError> {
 
     write_sec(&mut file, SEC_PPC_REGS, &save_ppc(&hw.ppc))?;
     write_sec(&mut file, SEC_CF_REGS, &save_cf(&hw.coldfire))?;
-    // SEC_SYSTEM_RAM = RAM unificada 24MB (Chip RAM legado vazio/omitido)
+    // SEC_SYSTEM_RAM = RAM unificada 28MB (Chip RAM legado vazio/omitido)
     write_sec(&mut file, SEC_SYSTEM_RAM, &save_mem_region(hw.bus.mem.unified_ram()))?;
     write_sec(&mut file, SEC_VRAM, &save_mem_region(hw.bus.mem.vram()))?;
     write_sec(&mut file, SEC_GPU, &save_gpu(&hw.bus.gpu))?;

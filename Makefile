@@ -42,22 +42,22 @@ check-abi:
 # ── Testes ────────────────────────────────────────────────────────────
 
 test-hello: build rom-hello
-	cargo run --release --bin cd32-rs -- --bios rom/hello_cd32.rom --cycles 5000000
+	cargo run --release --bin ml-gd2-rs -- --bios rom/hello_cd32.rom --cycles 5000000
 
 test-game: build rom-game
-	cargo run --release --bin cd32-rs -- --bios rom/game_cd32.rom --cycles $(CYCLES)
+	cargo run --release --bin ml-gd2-rs -- --bios rom/game_cd32.rom --cycles $(CYCLES)
 
 trace-hello: build rom-hello
-	cargo run --release --bin cd32-rs -- --bios rom/hello_cd32.rom --cycles 50000 --trace
+	cargo run --release --bin ml-gd2-rs -- --bios rom/hello_cd32.rom --cycles 50000 --trace
 
 # ── SDL ───────────────────────────────────────────────────────────────
 
 sdl-hello: build-sdl rom-hello
-	cargo run --release --features sdl-frontend --bin cd32-rs -- \
+	cargo run --release --features sdl-frontend --bin ml-gd2-rs -- \
 		--bios rom/hello_cd32.rom --sdl
 
 sdl-game: build-sdl rom-game
-	cargo run --release --features sdl-frontend --bin cd32-rs -- \
+	cargo run --release --features sdl-frontend --bin ml-gd2-rs -- \
 		--bios rom/game_cd32.rom --sdl
 
 # ── Docker Toolchain ──────────────────────────────────────────────────

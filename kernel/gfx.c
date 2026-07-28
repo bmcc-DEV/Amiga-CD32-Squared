@@ -24,6 +24,16 @@ void cd32_gfx_clear(cd32_dl_t *dl, uint32_t color) {
     dl_push(dl, CD32_DL_CLEAR, 0, color & 0x00FFFFFF);
 }
 
+void cd32_gfx_rect(cd32_dl_t *dl, int x, int y, int w, int h, uint32_t color) {
+    /* Quantiza para grelha 40×30 (4 bits cada campo em flags) */
+    int qx = x / 40; if (qx < 0) qx = 0; if (qx > 15) qx = 15;
+    int qy = y / 30; if (qy < 0) qy = 0; if (qy > 15) qy = 15;
+    int qw = (w + 39) / 40; if (qw < 1) qw = 1; if (qw > 15) qw = 15;
+    int qh = (h + 29) / 30; if (qh < 1) qh = 1; if (qh > 15) qh = 15;
+    uint16_t flags = (uint16_t)((qx << 12) | (qy << 8) | (qw << 4) | qh);
+    dl_push(dl, CD32_DL_RECT, flags, color & 0x00FFFFFF);
+}
+
 void cd32_gfx_tri(cd32_dl_t *dl, int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
     int wi = dl->ptr;
     uint32_t *buf = dl->buffer;
@@ -34,6 +44,16 @@ void cd32_gfx_tri(cd32_dl_t *dl, int x0, int y0, int x1, int y1, int x2, int y2,
     dl->ptr += 4; /* 4 words por triangulo */
     /* data = byte offset no cmd_buf = wi * 4 */
     dl_push(dl, CD32_DL_TRIANGLE, 0, wi * 4);
+}
+
+void cd32_gfx_line(cd32_dl_t *dl, int x0, int y0, int x1, int y1, uint32_t color) {
+    int wi = dl->ptr;
+    uint32_t *buf = dl->buffer;
+    buf[wi + 0] = ((uint32_t)(int16_t)x0 << 16) | (uint16_t)(int16_t)y0;
+    buf[wi + 1] = ((uint32_t)(int16_t)x1 << 16) | (uint16_t)(int16_t)y1;
+    buf[wi + 2] = color & 0x00FFFFFF;
+    dl->ptr += 3; /* 3 words por linha */
+    dl_push(dl, CD32_DL_LINE, 0, wi * 4);
 }
 
 void cd32_gfx_submit(cd32_dl_t *dl) {

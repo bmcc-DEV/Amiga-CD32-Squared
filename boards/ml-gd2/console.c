@@ -105,7 +105,7 @@ static const char *banner[] = {
     "║         Plataforma Aberta CDG2-PPC         ║",
     "║                                              ║",
     "║  PPC603e @ 266MHz  |  ColdFire V4e @ 140MHz  ║",
-    "║  GPU Lisa II |  24MB Unified RAM  |  8MB VRAM ║",
+    "║  GPU Lisa II |  28MB Unified RAM  |  8MB VRAM ║",
     "║                                              ║",
     "║         Inicializando AROS...                 ║",
     "║                                              ║",
