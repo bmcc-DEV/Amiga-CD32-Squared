@@ -1,15 +1,13 @@
-//! Áudio do CD³²: DSP + ColdFire co-processamento.
-//!
-//! O CD³² não tem chip de áudio dedicado (polêmica conhecida na comunidade).
-//! O áudio é processado pelo ColdFire em conjunto com um DSP interno que
-//! faz mixagem de canais, reamostragem e efeitos.
-//!
-//! Canais: 8 (estéreo, 16-bit, 44.1kHz)
-//! FIFO: 2KB por canal, preenchido via DMA pela Chip RAM.
-
 const NUM_CHANNELS: usize = 8;
-const FIFO_SIZE: usize = 2048;
+const FIFO_SIZE: usize = 4096;
 const SAMPLE_RATE: u32 = 44100;
+
+const DSP_REG_CTRL: usize = 0;     // 0x00
+const DSP_REG_VOL: usize = 1;      // 0x04
+const DSP_CH_BUF: usize = 4;       // 0x10 + ch*16 + 0
+const DSP_CH_LEN: usize = 5;       // 0x10 + ch*16 + 4
+const DSP_CH_CTRL: usize = 6;      // 0x10 + ch*16 + 8
+const DSP_CH_STAT: usize = 7;      // 0x10 + ch*16 + 12
 
 #[derive(Debug, Clone)]
 pub struct AudioChannel {
@@ -17,10 +15,10 @@ pub struct AudioChannel {
     rd_ptr: usize,
     wr_ptr: usize,
     enabled: bool,
-    volume: u16,       // 0..1024
-    pan: u8,           // 0..255 (0=esquerda, 255=direita)
-    _sample_pos: u32,    // posição atual na waveform (para streaming)
-    _loop_enabled: bool,
+    volume: u16,
+    pan: u8,
+    sample_pos: u32,
+    loop_enabled: bool,
 }
 
 impl AudioChannel {
@@ -32,8 +30,8 @@ impl AudioChannel {
             enabled: false,
             volume: 1024,
             pan: 128,
-            _sample_pos: 0,
-            _loop_enabled: false,
+            sample_pos: 0,
+            loop_enabled: false,
         }
     }
 
@@ -49,14 +47,27 @@ impl AudioChannel {
         }
         s
     }
+
+    fn samples_avail(&self) -> usize {
+        if self.wr_ptr >= self.rd_ptr {
+            self.wr_ptr - self.rd_ptr
+        } else {
+            FIFO_SIZE - self.rd_ptr + self.wr_ptr
+        }
+    }
+
+    fn reset_fifo(&mut self) {
+        self.rd_ptr = 0;
+        self.wr_ptr = 0;
+    }
 }
 
 pub struct AudioSubsystem {
-    channels: Vec<AudioChannel>,
+    pub channels: Vec<AudioChannel>,
     master_volume: u16,
-    output_l: i16,
-    output_r: i16,
-    dsp_regs: [u32; 64],  // DSP control registers
+    pub output_l: i16,
+    pub output_r: i16,
+    pub dsp_regs: [u32; 64],
     cycle_accum: u32,
 }
 
@@ -80,12 +91,11 @@ impl AudioSubsystem {
         }
         self.cycle_accum -= sample_clock;
 
-        // Mixa todos os canais ativos
         let mut mix_l: i32 = 0;
         let mut mix_r: i32 = 0;
 
         for ch in &mut self.channels {
-            if !ch.enabled {
+            if !ch.enabled || ch.samples_avail() == 0 {
                 continue;
             }
             let s = ch.read_sample() as i32;
@@ -95,25 +105,37 @@ impl AudioSubsystem {
             let pan_r = (ch.pan as i32) * s_vol / 255;
             mix_l += pan_l;
             mix_r += pan_r;
+
+            if ch.samples_avail() == 0 && ch.loop_enabled {
+                ch.reset_fifo();
+            }
         }
 
-        // Master volume + clipping
         mix_l = mix_l * self.master_volume as i32 / 1024;
         mix_r = mix_r * self.master_volume as i32 / 1024;
         self.output_l = mix_l.clamp(i16::MIN as i32, i16::MAX as i32) as i16;
         self.output_r = mix_r.clamp(i16::MIN as i32, i16::MAX as i32) as i16;
     }
 
-    pub fn push_sample(&mut self, channel: usize, sample: i16) {
-        if channel < NUM_CHANNELS {
-            self.channels[channel].push_sample(sample);
+    pub fn load_channel_samples(&mut self, ch: usize, data: &[i16]) {
+        if ch >= NUM_CHANNELS { return; }
+        for &s in data {
+            self.channels[ch].push_sample(s);
         }
     }
 
-    pub fn set_channel_enabled(&mut self, channel: usize, enabled: bool) {
-        if channel < NUM_CHANNELS {
-            self.channels[channel].enabled = enabled;
+    pub fn trigger_channel(&mut self, ch: usize, buf_addr: u32, buf_len: u32, flags: u32) -> bool {
+        if ch >= NUM_CHANNELS { return false; }
+        self.channels[ch].enabled = (flags & 1) != 0;
+        self.channels[ch].loop_enabled = (flags & 2) != 0;
+        if flags & 1 != 0 {
+            self.channels[ch].reset_fifo();
         }
+        true
+    }
+
+    pub fn channel_enabled(&self, ch: usize) -> bool {
+        if ch >= NUM_CHANNELS { false } else { self.channels[ch].enabled }
     }
 
     pub fn read_byte(&self, addr: u32) -> u8 {
@@ -132,10 +154,7 @@ impl AudioSubsystem {
     }
 
     pub fn write_byte(&mut self, addr: u32, val: u8) {
-        if addr & 3 != 0 {
-            // registros DSP são word-aligned
-            return;
-        }
+        if addr & 3 != 0 { return; }
         let idx = ((addr & 0xFF) >> 2) as usize;
         if idx < 64 {
             self.dsp_regs[idx] = (self.dsp_regs[idx] & !0xFF) | val as u32;
@@ -155,10 +174,25 @@ impl AudioSubsystem {
         let idx = ((addr & 0xFF) >> 2) as usize;
         if idx < 64 {
             self.dsp_regs[idx] = val;
-            // Reg 0 = control: bits 0-7 enable channels
-            if idx == 0 {
+            if idx == DSP_REG_CTRL {
+                let mask = val as u8;
                 for ch in 0..NUM_CHANNELS.min(8) {
-                    self.channels[ch].enabled = (val >> ch) & 1 != 0;
+                    let was = self.channels[ch].enabled;
+                    self.channels[ch].enabled = (mask >> ch) & 1 != 0;
+                }
+            }
+            if idx == DSP_REG_VOL {
+                self.master_volume = (val & 0xFFFF) as u16;
+            }
+            if idx >= DSP_CH_BUF && (idx - DSP_CH_BUF) % 4 == 2 {
+                let ch = (idx - DSP_CH_BUF) / 4;
+                let flags = val;
+                if ch < NUM_CHANNELS {
+                    self.channels[ch].enabled = (flags & 1) != 0;
+                    self.channels[ch].loop_enabled = (flags & 2) != 0;
+                    if flags & 1 != 0 {
+                        self.channels[ch].reset_fifo();
+                    }
                 }
             }
         }

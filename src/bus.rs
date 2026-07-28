@@ -538,7 +538,27 @@ impl BusInterface for Bus {
                 Some(())
             }
             MemRegion::AudioDsp => {
+                let prev = self.audio.dsp_regs[((addr & 0xFF) >> 2) as usize];
                 self.audio.write_word(addr, val);
+                // Intercepta escrita no registrador de controle do canal DSP
+                let idx = ((addr & 0xFF) >> 2) as usize;
+                let ch_base = 4; // DSP_CH_BUF
+                if idx >= ch_base && (idx - ch_base) % 4 == 2 {
+                    let ch = (idx - ch_base) / 4;
+                    let just_triggered = (val & 1) != 0 && (prev & 1) == 0;
+                    if ch < 8 && just_triggered {
+                        let buf_addr = self.audio.dsp_regs[ch_base + ch * 4 + 0];
+                        let buf_len = self.audio.dsp_regs[ch_base + ch * 4 + 1] as usize;
+                        if buf_len > 0 && buf_addr as usize + buf_len <= self.mem.unified_ram().len() {
+                            let data = self.mem.unified_ram()[buf_addr as usize..buf_addr as usize + buf_len].to_vec();
+                            let samples: Vec<i16> = data.chunks(2).map(|c| {
+                                if c.len() >= 2 { i16::from_be_bytes([c[0], c[1]]) } else { 0 }
+                            }).collect();
+                            self.audio.load_channel_samples(ch, &samples);
+                            log::debug!("Audio: loaded {} samples into ch{}", samples.len(), ch);
+                        }
+                    }
+                }
                 Some(())
             }
             MemRegion::CdromRegs => {
