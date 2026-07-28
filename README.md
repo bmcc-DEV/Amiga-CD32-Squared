@@ -5,7 +5,7 @@ videogame com emulador cycle-accurate, runtime C para jogos (`libcd32.a`),
 SDK completo e ferramentas de build.
 
 ```text
- Amiga CD³² (1993) → Amiga FlameSnow (2024)
+ Amiga CD³² (1993) → Amiga FlameSnow (1999)
      32 bits               64 bits
      Motorola 68EC020      PowerPC 603e + ColdFire V4e
      Akiko chip            GPU Lisa II TBDR
