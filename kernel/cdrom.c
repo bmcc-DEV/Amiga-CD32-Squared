@@ -69,6 +69,33 @@ int cd32_cdrom_init(void)
     return (t > 0) ? 0 : -1;
 }
 
+/* ── DVD init ─────────────────────────────────────────────────────── */
+int cd32_dvd_init(void)
+{
+    if (!(CD32_DVD_STAT & 1)) return -1;
+    CD32_DVD_CMD = 0x10;
+    int t = 1000000;
+    while (!(CD32_DVD_FLAGS & 2) && --t > 0) {}
+    return (t > 0) ? 0 : -1;
+}
+
+int cd32_dvd_present(void)
+{
+    return (CD32_DVD_STAT & 1) != 0;
+}
+
+int cd32_dvd_read(uint32_t lba, int count, void *buf)
+{
+    CD32_DVD_ARG0 = lba;
+    CD32_DVD_ARG1 = (uint32_t)count;
+    CD32_DVD_CMD = 1;
+    int t = 100000;
+    while (!(CD32_DVD_FLAGS & 4) && --t > 0) {}
+    if (t == 0 || (CD32_DVD_FLAGS & 8)) return -1;
+    cd32_dma_copy(0x08001000, (uint32_t)buf, (uint32_t)count * SECTOR_SIZE);
+    return 0;
+}
+
 /* ── cdrom_read (via DMA) ───────────────────────────────────────── */
 int cd32_cdrom_read(uint32_t lba, int count, void *buf)
 {
@@ -199,19 +226,58 @@ static void *load_elf(uint32_t lba, uint32_t size)
     return (void*)hdr->entry;
 }
 
+/* ── DVD ISO9660 loader (reuses ISO9660 helpers) ──────────────────── */
+static void *cdrom_load_from_dvd(void)
+{
+    uint8_t pvd[SECTOR_SIZE];
+    for (int i = 0; i < 100; i++) {
+        if (cd32_dvd_read(16, 1, pvd) == 0) break;
+        if (i == 99) return NULL;
+    }
+    if (pvd[0] != 1) return NULL;
+
+    uint32_t root_lba  = (uint32_t)pvd[158]<<24 | (uint32_t)pvd[157]<<16 | (uint32_t)pvd[156]<<8 | pvd[155];
+    uint32_t root_size = (uint32_t)pvd[166]<<24 | (uint32_t)pvd[165]<<16 | (uint32_t)pvd[164]<<8 | pvd[163];
+    if (root_size == 0) {
+        root_lba  = (uint32_t)pvd[156+2] | (uint32_t)pvd[156+3]<<8 | (uint32_t)pvd[156+4]<<16 | (uint32_t)pvd[156+5]<<24;
+        root_size = (uint32_t)pvd[156+10] | (uint32_t)pvd[156+11]<<8 | (uint32_t)pvd[156+12]<<16 | (uint32_t)pvd[156+13]<<24;
+    }
+
+    uint32_t file_lba, file_size;
+    if (find_in_dir("GAME.ELF", root_lba, root_size, &file_lba, &file_size) < 0) {
+        cd32_printf("DVD: GAME.ELF not found.\n");
+        return NULL;
+    }
+
+    void *entry = load_elf(file_lba, file_size);
+    if (entry) {
+        cd32_printf("DVD: GAME.ELF loaded: entry=0x%08X size=%d sectors\n",
+                     (uint32_t)entry, (file_size + SECTOR_SIZE - 1) / SECTOR_SIZE);
+    }
+    return entry;
+}
+
 /* ── cdrom_load ──────────────────────────────────────────────────── */
 void *cd32_cdrom_load(const char *path)
 {
-    (void)path;  /* ignored — always looks for GAME.ELF */
+    (void)path;
+
+    if (cd32_dvd_present()) {
+        cd32_printf("DVD: disco presente, montando...\n");
+        if (cd32_dvd_init() == 0) {
+            return cdrom_load_from_dvd();
+        }
+    }
 
     uint32_t root_lba, root_size;
     if (read_root_dir(&root_lba, &root_size) < 0) return NULL;
+
+    cd32_printf("CD: montado, procurando GAME.ELF...\n");
 
     uint32_t file_lba, file_size;
     if (find_in_dir("GAME.ELF", root_lba, root_size, &file_lba, &file_size) < 0)
         return NULL;
 
-    /* Read and load ELF */
     void *entry = load_elf(file_lba, file_size);
     if (entry) {
         cd32_printf("GAME.ELF loaded: entry=0x%08X size=%d sectors\n",

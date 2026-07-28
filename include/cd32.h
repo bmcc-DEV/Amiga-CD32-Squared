@@ -65,6 +65,28 @@ uint16_t cd32_joypad_read(void);
 uint16_t cd32_joypad_pressed(int btn);
 uint16_t cd32_joypad_just_pressed(int btn);
 
+/* ── Analog sticks (evolução orgânica do CD32) ──────────────────── */
+#define CD32_ANALOG_LEFT_X  0
+#define CD32_ANALOG_LEFT_Y  1
+#define CD32_ANALOG_RIGHT_X 2
+#define CD32_ANALOG_RIGHT_Y 3
+
+int16_t cd32_analog_read(int axis);
+
+/* ── DVD (mídia opcional, escolha da desenvolvedora) ────────────── */
+#define CD32_DVD_BASE     0x08000000UL
+
+#define CD32_DVD_STAT     (*(volatile uint32_t*)(CD32_DVD_BASE + 0x00))
+#define CD32_DVD_CMD      (*(volatile uint32_t*)(CD32_DVD_BASE + 0x10))
+#define CD32_DVD_ARG0     (*(volatile uint32_t*)(CD32_DVD_BASE + 0x14))
+#define CD32_DVD_ARG1     (*(volatile uint32_t*)(CD32_DVD_BASE + 0x18))
+#define CD32_DVD_DATA     ((volatile uint8_t*)0x08001000)
+#define CD32_DVD_FLAGS    (*(volatile uint32_t*)(CD32_DVD_BASE + 0x04))
+
+int  cd32_dvd_init(void);
+int  cd32_dvd_read(uint32_t lba, int count, void *buf);
+int  cd32_dvd_present(void);
+
 /* ── Audio ───────────────────────────────────────────────────────── */
 #define CD32_AUDIO_CHANNELS 8
 
@@ -82,6 +104,16 @@ void *cd32_cdrom_load(const char *path);   /* retorna entry point */
 /* ── DMA ──────────────────────────────────────────────────────────── */
 void cd32_dma_copy(uint32_t src, uint32_t dst, uint32_t size);
 void cd32_dma_wait(void);
+
+/* ── Memory Card ──────────────────────────────────────────────────── */
+#define CD32_MEMCARD_SLOTS     2
+#define CD32_MEMCARD_BLOCK     512
+#define CD32_MEMCARD_BLOCKS    1024
+
+int  cd32_memcard_init(void);
+int  cd32_memcard_present(int slot);
+int  cd32_memcard_read(int slot, uint32_t block, void *buf);
+int  cd32_memcard_write(int slot, uint32_t block, const void *buf);
 
 /* ── System ────────────────────────────────────────────────────────── */
 void cd32_halt(void) __attribute__((noreturn));

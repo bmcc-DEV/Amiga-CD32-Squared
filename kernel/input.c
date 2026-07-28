@@ -1,10 +1,3 @@
-/*
- * MontêLauro CD+G² — Input (joypad via ColdFire mailbox)
- *
- * Lê GPIO do ColdFire no offset 0x20 via mailbox CF_CMD_IO_READ (0x02).
- * GPIO bits: 0=UP, 1=DN, 2=L, 3=R, 4=A, 5=B, 6=START, 7=SEL
- */
-
 #include "cd32.h"
 
 #define MAILBOX_CMD  (*(volatile uint32_t*)(CD32_MAILBOX + 0x00))
@@ -13,6 +6,7 @@
 #define MAILBOX_ARG  (*(volatile uint32_t*)(CD32_MAILBOX + 0x0C))
 
 #define CF_CMD_IO_READ 0x02
+#define CF_CMD_ANALOG  0x08
 
 static uint16_t state = 0, prev = 0, changed = 0;
 
@@ -41,3 +35,14 @@ void cd32_input_poll(void)
 uint16_t cd32_joypad_read(void) { return state; }
 uint16_t cd32_joypad_pressed(int btn) { return state & btn; }
 uint16_t cd32_joypad_just_pressed(int btn) { return state & changed & btn; }
+
+int16_t cd32_analog_read(int axis)
+{
+    if (axis < 0 || axis > 3) return 0;
+    while (MAILBOX_STAT != 0) {}
+    MAILBOX_ARG = (uint32_t)axis;
+    MAILBOX_CMD = CF_CMD_ANALOG;
+    MAILBOX_STAT = 1;
+    while (MAILBOX_STAT != 0) {}
+    return (int16_t)MAILBOX_RESP;
+}

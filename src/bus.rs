@@ -9,6 +9,7 @@ use crate::audio::AudioSubsystem;
 use crate::cdrom::CdromDrive;
 use crate::dma::DmaController;
 use crate::interrupt::{InterruptController, IrqSource};
+use crate::memcard::MemoryCard;
 
 // Mailbox commands (docs/aros/abi.md)
 const CF_CMD_EXEC: u32 = 0x01;
@@ -18,6 +19,7 @@ const CF_CMD_JOYPAD: u32 = 0x04;
 const CF_CMD_CDROM_STATUS: u32 = 0x05;
 const CF_CMD_DMA_AUDIO: u32 = 0x06;
 const CF_CMD_UART_WRITE: u32 = 0x07;
+const CF_CMD_ANALOG: u32 = 0x08;
 const CF_CMD_HALT: u32 = 0xFF;
 
 // ── DVD Expansion Slot ──────────────────────────────────────────────
@@ -47,6 +49,71 @@ impl DvdExpansion {
         self.regs[0] = 0x00;
         log::info!("DVD: ejected");
     }
+
+    fn sector_size(&self) -> usize { 2048 }
+
+    pub fn read_byte(&self, addr: u32) -> u8 {
+        let offset = (addr & 0xFFF) as usize;
+        // Registers at 0x00-0x3F, data buffer at 0x1000
+        if offset < 0x40 {
+            let idx = offset >> 2;
+            if idx < 16 {
+                return (self.regs[idx] >> ((offset & 3) * 8)) as u8;
+            }
+            return 0;
+        }
+        if offset >= 0x1000 && offset < 0x1000 + self.sector_size() {
+            if let Some(ref data) = self.data {
+                let data_off = (self.regs[4] as usize) * self.sector_size() + (offset - 0x1000);
+                if data_off < data.len() {
+                    return data[data_off];
+                }
+            }
+        }
+        0
+    }
+
+    pub fn write_byte(&mut self, addr: u32, val: u8) {
+        let offset = (addr & 0xFFF) as usize;
+        if offset < 0x40 {
+            let idx = offset >> 2;
+            if idx < 16 {
+                let shift = (offset & 3) * 8;
+                self.regs[idx] = (self.regs[idx] & !(0xFF << shift)) | ((val as u32) << shift);
+                if idx == 4 {
+                    // Command register: handle read
+                    if val & 1 != 0 {
+                        // Read command would be processed here on real hw
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn read_word(&self, addr: u32) -> u32 {
+        let offset = (addr & 0xFFF) as usize;
+        if offset < 0x40 {
+            let idx = offset >> 2;
+            if idx < 16 { return self.regs[idx]; }
+        }
+        if offset >= 0x1000 && offset + 4 <= 0x1000 + self.sector_size() {
+            if let Some(ref data) = self.data {
+                let data_off = (self.regs[4] as usize) * self.sector_size() + (offset - 0x1000);
+                if data_off + 4 <= data.len() {
+                    return u32::from_be_bytes(data[data_off..data_off+4].try_into().unwrap());
+                }
+            }
+        }
+        0
+    }
+
+    pub fn write_word(&mut self, addr: u32, val: u32) {
+        let offset = (addr & 0xFFF) as usize;
+        if offset < 0x40 {
+            let idx = offset >> 2;
+            if idx < 16 { self.regs[idx] = val; }
+        }
+    }
 }
 
 // ColdFire I/O — registradores de 32 bits (lwz/stw nativos do PPC).
@@ -57,6 +124,7 @@ impl DvdExpansion {
 
 struct ColdFireIo {
     regs: [u32; 16],
+    analog: [i16; 4], // left_x, left_y, right_x, right_y
 }
 
 impl ColdFireIo {
@@ -64,7 +132,7 @@ impl ColdFireIo {
         let mut regs = [0u32; 16];
         regs[1] = 0x000000C0; // UART status: TX ready
         regs[8] = 0x0000_FFFF; // GPIO default: all released = all high (active-low)
-        Self { regs }
+        Self { regs, analog: [0i16; 4] }
     }
 
     fn read32(&self, offset: u32) -> u32 {
@@ -121,6 +189,7 @@ pub struct Bus {
     pub intc: InterruptController,
     pub dma: DmaController,
     pub dvd: DvdExpansion,
+    pub memcard: MemoryCard,
 }
 
 impl Bus {
@@ -142,6 +211,7 @@ impl Bus {
             intc: InterruptController::new(),
             dma: DmaController::new(),
             dvd: DvdExpansion::new(),
+            memcard: MemoryCard::new(),
         }
     }
 
@@ -210,6 +280,10 @@ impl Bus {
                 self.cfio.write32(0x00, byte as u32);
                 0
             }
+            CF_CMD_ANALOG => {
+                let axis = (arg & 0x3) as usize;
+                if axis < 4 { self.cfio.analog[axis] as u32 as u32 } else { 0 }
+            }
             CF_CMD_EXEC | CF_CMD_DMA_AUDIO => 0,
             CF_CMD_HALT => 0,
             _ => {
@@ -251,6 +325,10 @@ impl Bus {
         self.cfio.write32(0x20, (!state) as u32);
     }
 
+    pub fn set_analog(&mut self, left_x: i16, left_y: i16, right_x: i16, right_y: i16) {
+        self.cfio.analog = [left_x, left_y, right_x, right_y];
+    }
+
     pub fn joypad_raw_gpio(&self) -> u16 {
         self.cfio.read32(0x20) as u16
     }
@@ -281,7 +359,9 @@ impl BusInterface for Bus {
             MemRegion::GpuRegs => self.gpu.read_reg(addr).map(|v| v as u8),
             MemRegion::AudioDsp => Some(self.audio.read_byte(addr)),
             MemRegion::CdromRegs => Some(self.cdrom.read_byte(addr)),
-            MemRegion::DvdExpansion | MemRegion::Reserved => None,
+            MemRegion::DvdExpansion => Some(self.dvd.read_byte(addr)),
+            MemRegion::MemCard => self.memcard.read_byte(addr),
+            MemRegion::Reserved => None,
             MemRegion::MiuRegs => self.read_miu_reg(addr).map(|v| v as u8),
             MemRegion::Mailbox => self.read_mailbox(addr).map(|v| (v & 0xFF) as u8),
             MemRegion::ColdFireIo => {
@@ -312,6 +392,12 @@ impl BusInterface for Bus {
                 Some((v >> shift) as u16)
             }
             MemRegion::DmaRegs => Some((self.dma.read_reg(addr) & 0xFFFF) as u16),
+            MemRegion::MemCard => {
+                let lo = self.memcard.read_byte(addr)? as u16;
+                let hi = self.memcard.read_byte(addr + 1)? as u16;
+                Some((hi << 8) | lo)
+            }
+            MemRegion::DvdExpansion => Some(self.dvd.read_byte(addr) as u16 | (self.dvd.read_byte(addr + 1) as u16) << 8),
             _ => None,
         }
     }
@@ -331,6 +417,14 @@ impl BusInterface for Bus {
             MemRegion::Mailbox => self.read_mailbox(addr),
             MemRegion::ColdFireIo => Some(self.cfio.read32(addr & 0x3F)),
             MemRegion::DmaRegs => Some(self.dma.read_reg(addr)),
+            MemRegion::MemCard => {
+                let b0 = self.memcard.read_byte(addr)? as u32;
+                let b1 = self.memcard.read_byte(addr + 1)? as u32;
+                let b2 = self.memcard.read_byte(addr + 2)? as u32;
+                let b3 = self.memcard.read_byte(addr + 3)? as u32;
+                Some((b3 << 24) | (b2 << 16) | (b1 << 8) | b0)
+            }
+            MemRegion::DvdExpansion => Some(self.dvd.read_word(addr)),
             _ => None,
         }
     }
@@ -369,6 +463,8 @@ impl BusInterface for Bus {
                     .write32(off & !3, (prev & mask) | ((val as u32) << shift));
                 Some(())
             }
+            MemRegion::MemCard => self.memcard.write_byte(addr, val),
+            MemRegion::DvdExpansion => { self.dvd.write_byte(addr, val); Some(()) }
             _ => None,
         }
     }
@@ -411,6 +507,12 @@ impl BusInterface for Bus {
                 self.dma.write_reg(addr, val as u32);
                 Some(())
             }
+            MemRegion::MemCard => {
+                self.memcard.write_byte(addr, (val & 0xFF) as u8);
+                self.memcard.write_byte(addr + 1, ((val >> 8) & 0xFF) as u8);
+                Some(())
+            }
+            MemRegion::DvdExpansion => { self.dvd.write_byte(addr, (val & 0xFF) as u8); self.dvd.write_byte(addr + 1, ((val >> 8) & 0xFF) as u8); Some(()) }
             _ => None,
         }
     }
@@ -459,6 +561,14 @@ impl BusInterface for Bus {
                 self.dma.write_reg(addr, val);
                 Some(())
             }
+            MemRegion::MemCard => {
+                self.memcard.write_byte(addr, (val >> 24) as u8);
+                self.memcard.write_byte(addr + 1, ((val >> 16) & 0xFF) as u8);
+                self.memcard.write_byte(addr + 2, ((val >> 8) & 0xFF) as u8);
+                self.memcard.write_byte(addr + 3, (val & 0xFF) as u8);
+                Some(())
+            }
+            MemRegion::DvdExpansion => { self.dvd.write_word(addr, val); Some(()) }
             _ => None,
         }
     }
@@ -483,6 +593,7 @@ impl BusInterface for Bus {
             }
             MemRegion::Vram => 3,
             MemRegion::ColdFireIo | MemRegion::Mailbox => 1,
+            MemRegion::MemCard | MemRegion::DvdExpansion => 5,
             _ => 0,
         }
     }

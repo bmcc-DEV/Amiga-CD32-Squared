@@ -9,6 +9,7 @@ pub mod interrupt;
 pub mod dma;
 pub mod disasm;
 pub mod save;
+pub mod memcard;
 
 #[cfg(feature = "sdl-frontend")]
 pub mod sdl_debug;

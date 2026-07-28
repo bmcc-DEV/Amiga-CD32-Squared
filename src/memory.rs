@@ -29,6 +29,12 @@ pub const DEFAULT_STACK: u32 = 0x01BF_0000;
 /// Tamanho total reportado na ABI (28MB).
 pub const TOTAL_RAM_BYTES: u32 = UNIFIED_RAM_SIZE as u32;
 
+/// Memory Card — 2 slots × 512KB em 0x0600_0000
+pub const MEMCARD_BASE: u32 = 0x0600_0000;
+pub const MEMCARD_SIZE: usize = 512 * 1024; // 512KB per slot
+pub const MEMCARD_SLOT_SIZE: u32 = MEMCARD_SIZE as u32;
+pub const MEMCARD_CTRL_BASE: u32 = 0x0610_0000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemRegion {
     /// RAM unificada 28MB (substitui SysRAM+ChipRAM).
@@ -48,6 +54,7 @@ pub enum MemRegion {
     MiuRegs,
     Mailbox,
     DvdExpansion,
+    MemCard,
     Reserved,
 }
 
@@ -86,6 +93,7 @@ impl MemoryMap {
             0x03E0_0000..=0x03EF_FFFF => MemRegion::DmaRegs,
             0x0400_0000..=0x0400_FFFF => MemRegion::GpuRegs,
             0x0500_0000..=0x0500_000F => MemRegion::MiuRegs,
+            0x0600_0000..=0x0610_0FFF => MemRegion::MemCard,
             0x0800_0000..=0x0800_FFFF => MemRegion::DvdExpansion,
             0xFF00_0000..=0xFF07_FFFF => MemRegion::BootRom,
             _ => MemRegion::Reserved,

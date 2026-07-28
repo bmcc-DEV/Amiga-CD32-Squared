@@ -8,7 +8,7 @@ CFLAGS  ?= -O0 -mcpu=603e -mhard-float -ffreestanding -nostdlib \
            -I../include -I.
 LDFLAGS ?= -nostdlib -ffreestanding -Wl,-T,linker.ld -Wl,--build-id=none
 
-OBJS = kernel.o video.o input.o audio.o cdrom.o dma.o string.o gfx.o pad.o
+OBJS = kernel.o video.o input.o audio.o cdrom.o dma.o string.o gfx.o pad.o memcard.o
 
 all: libcd32.a
 

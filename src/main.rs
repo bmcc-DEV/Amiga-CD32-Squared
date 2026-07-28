@@ -32,9 +32,13 @@ struct Cli {
     #[arg(short = 'b', long = "bios", default_value = "kickstart.rom")]
     bios: PathBuf,
 
-    /// Imagem de CD (ISO9660 .bin/.iso) para montar
+    /// Imagem de disco (ISO9660 .bin/.iso) para montar
     #[arg(short = 'd', long = "disc")]
     disc: Option<PathBuf>,
+
+    /// Tipo de mídia: auto, cd, ou dvd
+    #[arg(long = "disc-type", default_value = "auto")]
+    disc_type: String,
 
     /// Número de ciclos a executar (0 = boot completo)
     #[arg(short = 'c', long = "cycles", default_value = "0")]
@@ -102,11 +106,21 @@ fn main() {
         }
     }
 
-    // Monta disco opcional
+    // Monta disco opcional (auto: >700MB → DVD, else CD)
     if let Some(disc_path) = &cli.disc {
         if let Ok(data) = std::fs::read(disc_path) {
-            log::info!("Loaded disc image: {} ({} bytes)", disc_path.display(), data.len());
-            hw.bus.cdrom.insert_disc(data);
+            let is_dvd = match cli.disc_type.as_str() {
+                "dvd" => true,
+                "cd" => false,
+                _ => data.len() > 700 * 1024 * 1024, // auto
+            };
+            if is_dvd {
+                log::info!("Mounted as DVD: {} ({} bytes)", disc_path.display(), data.len());
+                hw.bus.dvd.insert(data);
+            } else {
+                log::info!("Mounted as CD: {} ({} bytes)", disc_path.display(), data.len());
+                hw.bus.cdrom.insert_disc(data);
+            }
         } else {
             log::error!("Failed to load disc image: {}", disc_path.display());
         }
@@ -178,6 +192,7 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
     use sdl2::pixels::PixelFormatEnum;
     use std::time::Duration;
 
+    use sdl2::controller::{Axis, Button};
     use ml_gd2_rs::sdl_debug::{SdlLogger, render_debug_window, render_log_window, capture_log};
 
     log::set_boxed_logger(Box::new(SdlLogger))
@@ -187,6 +202,7 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
 
     let sdl = sdl2::init().expect("SDL init failed");
     let video = sdl.video().expect("SDL video init failed");
+    let controller_subsystem = sdl.game_controller().unwrap();
 
     const WW: u32 = 640;
     const WH: u32 = 480;
@@ -219,6 +235,22 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
     // Janela ativa para copia: 0=main, 1=debug, 2=log
     let mut active: u8 = 0;
     let mut joypad: u16 = 0;
+    let mut analog_lx: i16 = 0;
+    let mut analog_ly: i16 = 0;
+    let mut analog_rx: i16 = 0;
+    let mut analog_ry: i16 = 0;
+
+    // Game Controller (controle analogico)
+    let mut controller: Option<sdl2::controller::GameController> = None;
+    for i in 0..controller_subsystem.num_joysticks().unwrap_or(0) {
+        if controller_subsystem.is_game_controller(i).unwrap_or(false) {
+            if let Ok(c) = controller_subsystem.open(i) {
+                log::info!("Controller connected: {}", c.name());
+                controller = Some(c);
+                break;
+            }
+        }
+    }
 
     fn copy_text(text: &str) {
         use std::process::Command;
@@ -273,7 +305,7 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
                 }
                 _ => {}
             }
-            // Joypad tambem via teclado
+            // Joypad via teclado
             if let Event::KeyDown { keycode: Some(k), .. } = event {
                 joypad |= match k {
                     Keycode::Up => JOY_UP, Keycode::Down => JOY_DOWN,
@@ -294,7 +326,53 @@ fn run_sdl_frontend(mut hw: Cd32Hardware) {
                     _ => 0,
                 };
             }
+            // Controle analogico (game controller)
+            if let Event::ControllerAxisMotion { axis, value, .. } = event {
+                let v = value as i16;
+                match axis {
+                    Axis::LeftX => analog_lx = v,
+                    Axis::LeftY => analog_ly = v,
+                    Axis::RightX => analog_rx = v,
+                    Axis::RightY => analog_ry = v,
+                    _ => {}
+                }
+                // Mapeia analogico para digital
+                joypad = (joypad & !(JOY_UP|JOY_DOWN|JOY_LEFT|JOY_RIGHT))
+                    | if analog_ly < -8000 { JOY_UP } else { 0 }
+                    | if analog_ly > 8000 { JOY_DOWN } else { 0 }
+                    | if analog_lx < -8000 { JOY_LEFT } else { 0 }
+                    | if analog_lx > 8000 { JOY_RIGHT } else { 0 };
+            }
+            if let Event::ControllerButtonDown { button, .. } = event {
+                joypad |= match button {
+                    Button::A => JOY_A,
+                    Button::B => JOY_B,
+                    Button::Start => JOY_START,
+                    Button::Back => JOY_SELECT,
+                    Button::DPadUp => JOY_UP,
+                    Button::DPadDown => JOY_DOWN,
+                    Button::DPadLeft => JOY_LEFT,
+                    Button::DPadRight => JOY_RIGHT,
+                    _ => 0,
+                };
+            }
+            if let Event::ControllerButtonUp { button, .. } = event {
+                joypad &= !match button {
+                    Button::A => JOY_A,
+                    Button::B => JOY_B,
+                    Button::Start => JOY_START,
+                    Button::Back => JOY_SELECT,
+                    Button::DPadUp => JOY_UP,
+                    Button::DPadDown => JOY_DOWN,
+                    Button::DPadLeft => JOY_LEFT,
+                    Button::DPadRight => JOY_RIGHT,
+                    _ => 0,
+                };
+            }
         }
+
+        hw.bus.set_joypad(joypad);
+        hw.bus.set_analog(analog_lx, analog_ly, analog_rx, analog_ry);
 
         hw.bus.set_joypad(joypad);
         hw.run_cycles(4_400_000);
