@@ -1,4 +1,4 @@
-//! Validador de conformidade ABI MontêLauro CD+G².
+//! Validador de conformidade ABI Amiga FlameSnow.
 //!
 //! Verifica offsets da struct CD32Platform entre:
 //!   - src/cd32_abi.rs (gerado)

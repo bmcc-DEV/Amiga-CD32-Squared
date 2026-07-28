@@ -1,5 +1,5 @@
 /*
- * MontêLauro CD+G² — Demo minimo de jogo
+ * Amiga FlameSnow — Demo minimo de jogo
  *
  * Compilar: make demo
  * Executar no emulador: --bios rom/game_cd32.rom --disc rom/jogo.iso

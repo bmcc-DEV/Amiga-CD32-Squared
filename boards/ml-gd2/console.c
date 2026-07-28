@@ -101,7 +101,7 @@ static int initialized = 0;
 static const char *banner[] = {
     "╔══════════════════════════════════════════════╗",
     "║                                              ║",
-    "║         MontêLauro CD+G²  v1.0                ║",
+    "║         Amiga FlameSnow  v1.0                ║",
     "║         Plataforma Aberta CDG2-PPC         ║",
     "║                                              ║",
     "║  PPC603e @ 266MHz  |  ColdFire V4e @ 140MHz  ║",

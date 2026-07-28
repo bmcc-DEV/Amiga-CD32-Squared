@@ -1,4 +1,4 @@
-name: MontêLauro CD+G² CI
+name: Amiga FlameSnow CI
 
 on: [push, pull_request]
 

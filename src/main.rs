@@ -1,4 +1,4 @@
-//! CD³²-rs — Amiga CD³² Community Emulator
+//! flamesnow-rs — Amiga FlameSnow Emulator
 //!
 //! CLI para carregar BIOS, bootar o hardware, e executar (com ou sem frontend SDL).
 
@@ -26,7 +26,7 @@ const JOY_START: u16 = 1 << 6;
 const JOY_SELECT: u16 = 1 << 7;
 
 #[derive(Parser)]
-#[command(name = "ml-gd2-rs", version, about = "Amiga CD32² (CD32 Squared) — Emulator")]
+#[command(name = "flamesnow-rs", version, about = "Amiga FlameSnow — Emulator")]
 struct Cli {
     /// Caminho para o dump da Kickstart ROM (512KB)
     #[arg(short = 'b', long = "bios", default_value = "kickstart.rom")]

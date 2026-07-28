@@ -1,4 +1,4 @@
-# MontêLauro CD+G² (ML GD²) Board Support Package
+# Amiga FlameSnow (ML GD²) Board Support Package
 # Makefile para integração com o build system do AROS
 #
 # Uso (dentro da árvore AROS):

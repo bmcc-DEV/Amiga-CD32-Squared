@@ -1,5 +1,5 @@
 /*
- * MontêLauro CD+G² — Vídeo Lisa II (TBDR)
+ * Amiga FlameSnow — Vídeo Lisa II (TBDR)
  * Framebuffer 640x480 RGBA32 com font 8x16 para debug.
  * Sem variaveis globais (usa defines diretos).
  */

@@ -1,4 +1,4 @@
-//! Gera headers C/Rust da ABI MontêLauro CD+G².
+//! Gera headers C/Rust da ABI Amiga FlameSnow.
 //! Uso: cargo run --bin gen-headers
 
 use std::fs;

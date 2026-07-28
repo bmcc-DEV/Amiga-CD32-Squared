@@ -1,5 +1,5 @@
 #!/bin/sh
-# mkcd.sh — MontêLauro CD+G² ISO Mastering Tool
+# mkcd.sh — Amiga FlameSnow ISO Mastering Tool
 #
 # Empacota um jogo (.elf) em imagem ISO9660.
 # A desenvolvedora escolhe a midia:
@@ -35,7 +35,7 @@ ELF="${ELF:-kernel/demo.elf}"
 OUT="${OUT:-rom/jogo.iso}"
 TMP=$(mktemp -d)
 
-echo "=== MontêLauro CD+G² — ISO Mastering ==="
+echo "=== Amiga FlameSnow — ISO Mastering ==="
 echo "Midia:  $MEDIA"
 echo "Jogo:   $ELF"
 echo "ISO:    $OUT"

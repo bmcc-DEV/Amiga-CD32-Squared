@@ -1,5 +1,5 @@
 /*
- * MontêLauro CD+G² — string.h stubs (memset, memcpy)
+ * Amiga FlameSnow — string.h stubs (memset, memcpy)
  * Necessarios para o compilador quando -nostdlib.
  */
 

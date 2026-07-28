@@ -1,4 +1,4 @@
-# Amiga CD32² (CD32 Squared) — Makefile de Desenvolvimento
+# Amiga FlameSnow — Makefile de Desenvolvimento
 
 CARGO    ?= cargo
 ROM      ?= rom/game_cd32.rom

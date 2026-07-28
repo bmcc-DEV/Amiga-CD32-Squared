@@ -1,8 +1,8 @@
 /*
- * MontêLauro CD+G² — Game Runtime API (libcd32)
+ * Amiga FlameSnow — Game Runtime API (libcd32)
  * 
  * Header público para desenvolvimento de jogos.
- * Consulte sdk/api.md para documentação completa.
+ * Consulte docs/sdk/api.md para documentação completa.
  *
  * ABI v1.0 — MIT License
  */

@@ -1,5 +1,5 @@
 #!/bin/sh
-# build-aros.sh — Obtem o kernel AROS PPC para MontêLauro CD+G²
+# build-aros.sh — Obtem o kernel AROS PPC para Amiga FlameSnow
 #
 # Tenta, em ordem:
 #   1. Usar kernel ja compilado em /tmp/AROS (build anterior)
@@ -12,7 +12,7 @@ set -e
 
 KERNEL_DST="aros-ppc.bin"
 
-echo "=== MontêLauro CD+G² — AROS PPC Kernel ==="
+echo "=== Amiga FlameSnow — AROS PPC Kernel ==="
 
 # ── Opcao 1: Kernel ja compilado local ─────────────────────────────
 if [ -f "/tmp/AROS/build/ppc/bin/sam440-ppc/aros-ppc.bin" ]; then

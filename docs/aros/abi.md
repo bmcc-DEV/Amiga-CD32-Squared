@@ -1,4 +1,4 @@
-# AROS PPC ABI para CD³² / MontêLauro CD3²
+# AROS PPC ABI para Amiga FlameSnow
 
 ## Visão Geral
 
